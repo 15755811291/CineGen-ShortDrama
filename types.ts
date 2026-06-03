@@ -56,8 +56,18 @@ export interface Shot {
   interval?: VideoInterval;
 }
 
+export interface AiModelConfig {
+  provider: 'google' | 'siliconflow' | 'custom';
+  apiKey: string;
+  baseUrl?: string;
+  textModel: string;
+  imageModel: string;
+  videoModel: string;
+}
+
 export interface ScriptData {
   title: string;
+  // ... 其他字段保持不变
   genre: string;
   logline: string;
   targetDuration?: string;

@@ -14,7 +14,7 @@ export const setGlobalApiKey = (key: string) => {
 
 // Helper to get a fresh client instance to ensure latest API key is used
 const getAiClient = () => {
-  if (!runtimeApiKey) throw new Error("API Key missing. Please configure your Gemini API Key.");
+  if (!runtimeApiKey) return null;
   return new GoogleGenAI({ apiKey: runtimeApiKey });
 };
 
@@ -51,8 +51,9 @@ const cleanJsonString = (str: string): string => {
  * Agent 1 & 2: Script Structuring & Breakdown
  * Uses gemini-2.5-flash for fast, structured text generation.
  */
-export const parseScriptToData = async (rawText: string, language: string = '中文'): Promise<ScriptData> => {
+export const parseScriptToData = async (rawText: string, language: string = '中文', modelName: string = 'gemini-2.5-flash'): Promise<ScriptData> => {
   const ai = getAiClient();
+  if (!ai) throw new Error("API Key missing. Please configure your Gemini API Key.");
   const prompt = `
     Analyze the text and output a JSON object in the language: ${language}.
     
@@ -67,7 +68,7 @@ export const parseScriptToData = async (rawText: string, language: string = '中
   `;
 
   const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: modelName,
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -152,12 +153,13 @@ export const parseScriptToData = async (rawText: string, language: string = '中
   };
 };
 
-export const generateShotList = async (scriptData: ScriptData): Promise<Shot[]> => {
+export const generateShotList = async (scriptData: ScriptData, modelName: string = 'gemini-2.5-flash'): Promise<Shot[]> => {
   if (!scriptData.scenes || scriptData.scenes.length === 0) {
     return [];
   }
 
   const ai = getAiClient();
+  if (!ai) throw new Error("API Key missing. Please configure your Gemini API Key.");
   const lang = scriptData.language || '中文';
   
   // Helper to process a single scene
@@ -200,7 +202,7 @@ export const generateShotList = async (scriptData: ScriptData): Promise<Shot[]> 
 
     try {
       const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: modelName,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -276,21 +278,30 @@ export const generateShotList = async (scriptData: ScriptData): Promise<Shot[]> 
       ...k, 
       id: `kf-${idx + 1}-${k.type}`, // Normalized ID
       status: 'pending' 
-    })) : []
+    })) : [],
+    interval: {
+      id: `interval-${idx + 1}`,
+      startKeyframeId: `kf-${idx + 1}-start`,
+      endKeyframeId: `kf-${idx + 1}-end`,
+      duration: 5,
+      motionStrength: 5,
+      status: 'pending'
+    }
   }));
 };
 
 /**
  * Agent 3: Visual Design (Prompt Generation)
  */
-export const generateVisualPrompts = async (type: 'character' | 'scene', data: Character | Scene, genre: string): Promise<string> => {
+export const generateVisualPrompts = async (type: 'character' | 'scene', data: Character | Scene, genre: string, modelName: string = 'gemini-2.5-flash'): Promise<string> => {
    const ai = getAiClient();
+   if (!ai) throw new Error("API Key missing. Please configure your Gemini API Key.");
    const prompt = `Generate a high-fidelity visual prompt for a ${type} in a ${genre} movie. 
    Data: ${JSON.stringify(data)}. 
    Output only the prompt in English, comma-separated, focused on visual details (lighting, texture, appearance).`;
 
    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-     model: 'gemini-2.5-flash',
+     model: modelName,
      contents: prompt,
    }));
    return response.text || "";
@@ -299,8 +310,9 @@ export const generateVisualPrompts = async (type: 'character' | 'scene', data: C
 /**
  * Agent 4 & 6: Image Generation
  */
-export const generateImage = async (prompt: string, referenceImages: string[] = []): Promise<string> => {
+export const generateImage = async (prompt: string, referenceImages: string[] = [], modelName: string = 'gemini-2.5-flash-image'): Promise<string> => {
   const ai = getAiClient();
+  if (!ai) throw new Error("API Key missing. Please configure your Gemini API Key.");
 
   // If we have reference images, instruct the model to use them for consistency
   let finalPrompt = prompt;
@@ -336,7 +348,7 @@ export const generateImage = async (prompt: string, referenceImages: string[] = 
   });
 
   const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-    model: 'gemini-2.5-flash-image', // Nano Banana
+    model: modelName, // Nano Banana
     contents: {
       parts: parts
     }
@@ -355,8 +367,9 @@ export const generateImage = async (prompt: string, referenceImages: string[] = 
  * Agent 8: Video Generation
  * Supports Start Image -> Video OR Start Image + End Image -> Video
  */
-export const generateVideo = async (prompt: string, startImageBase64?: string, endImageBase64?: string): Promise<string> => {
+export const generateVideo = async (prompt: string, startImageBase64?: string, endImageBase64?: string, modelName: string = 'veo-3.1-fast-generate-preview'): Promise<string> => {
   const ai = getAiClient();
+  if (!ai) throw new Error("API Key missing. Please configure your Gemini API Key.");
   const apiKey = runtimeApiKey; // Use runtime key
   
   // Clean base64 strings
@@ -378,7 +391,7 @@ export const generateVideo = async (prompt: string, startImageBase64?: string, e
   }
 
   let operation = await retryOperation<any>(() => ai.models.generateVideos({
-    model: 'veo-3.1-fast-generate-preview',
+    model: modelName,
     prompt: prompt,
     image: startImageBase64 ? {
       imageBytes: cleanStart,

@@ -6,10 +6,10 @@ import StageDirector from './components/StageDirector';
 import StageExport from './components/StageExport';
 import Dashboard from './components/Dashboard';
 import SettingsModal from './components/SettingsModal';
-import { ProjectState } from './types';
+import { ProjectState, AiModelConfig } from './types';
 import { Key, Save, CheckCircle, ArrowRight, ShieldCheck, Settings } from 'lucide-react';
 import { saveProjectToDB } from './services/storageService';
-import { setGlobalApiKey } from './services/geminiService';
+import { updateAiConfig } from './services/aiService';
 
 const HomeLinks = () => (
   <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-zinc-800 bg-black/70 px-4 py-2 text-[11px] font-mono text-zinc-400 backdrop-blur-sm">
@@ -37,21 +37,54 @@ function App() {
   const [project, setProject] = useState<ProjectState | null>(null);
   const [apiKey, setApiKey] = useState<string>('');
   const [inputKey, setInputKey] = useState('');
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('unsaved');
   const [themeColor, setThemeColor] = useState<string>('#6366f1');
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('dark');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  const [aiConfig, setAiConfig] = useState<AiModelConfig>(() => {
+    const stored = localStorage.getItem('cinegen_ai_config');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error("Failed to parse AI config", e);
+      }
+    }
+    return {
+      provider: 'google',
+      apiKey: '',
+      textModel: 'gemini-2.5-flash',
+      imageModel: 'gemini-2.5-flash-image',
+      videoModel: 'veo-3.1-fast-generate-preview'
+    };
+  });
+
   // Ref to hold debounce timer
   const saveTimeoutRef = useRef<any>(null);
+  const statusHideTimeoutRef = useRef<any>(null);
 
   // Load API Key and Theme from localStorage on mount
   useEffect(() => {
+    const storedConfig = localStorage.getItem('cinegen_ai_config');
     const storedKey = localStorage.getItem('cinegen_api_key');
+    
+    let finalConfig = aiConfig;
+    if (storedConfig) {
+      try {
+        finalConfig = JSON.parse(storedConfig);
+      } catch (e) {
+        console.error("Failed to parse stored config", e);
+      }
+    }
+
     if (storedKey) {
       setApiKey(storedKey);
-      setGlobalApiKey(storedKey);
+      finalConfig = { ...finalConfig, apiKey: finalConfig.apiKey || storedKey };
     }
+    
+    setAiConfig(finalConfig);
+    updateAiConfig(finalConfig);
 
     const storedColor = localStorage.getItem('cinegen_theme_color');
     if (storedColor) {
@@ -70,7 +103,6 @@ function App() {
 
   const applyThemeColor = (color: string) => {
     document.documentElement.style.setProperty('--brand-color', color);
-    // Convert hex to rgb for rgba usage
     const r = parseInt(color.slice(1, 3), 16);
     const g = parseInt(color.slice(3, 5), 16);
     const b = parseInt(color.slice(5, 7), 16);
@@ -97,6 +129,17 @@ function App() {
     localStorage.setItem('cinegen_theme_mode', mode);
   };
 
+  const handleAiConfigChange = (config: AiModelConfig) => {
+    setAiConfig(config);
+    updateAiConfig(config);
+    localStorage.setItem('cinegen_ai_config', JSON.stringify(config));
+    // 同步更新 apiKey，防止退出登录逻辑失效
+    if (config.apiKey) {
+      setApiKey(config.apiKey);
+      localStorage.setItem('cinegen_api_key', config.apiKey);
+    }
+  };
+
   // Auto-save logic
   useEffect(() => {
     if (!project) return;
@@ -109,6 +152,12 @@ function App() {
       try {
         await saveProjectToDB(project);
         setSaveStatus('saved');
+        
+        // 3秒后隐藏“已保存”状态
+        if (statusHideTimeoutRef.current) clearTimeout(statusHideTimeoutRef.current);
+        statusHideTimeoutRef.current = setTimeout(() => {
+          setSaveStatus('unsaved');
+        }, 3000);
       } catch (e) {
         console.error("Auto-save failed", e);
       }
@@ -122,14 +171,20 @@ function App() {
   const handleSaveKey = () => {
     if (!inputKey.trim()) return;
     setApiKey(inputKey);
-    setGlobalApiKey(inputKey);
+    const newConfig = { ...aiConfig, apiKey: inputKey };
+    setAiConfig(newConfig);
+    updateAiConfig(newConfig);
     localStorage.setItem('cinegen_api_key', inputKey);
+    localStorage.setItem('cinegen_ai_config', JSON.stringify(newConfig));
   };
 
   const handleClearKey = () => {
     localStorage.removeItem('cinegen_api_key');
+    localStorage.removeItem('cinegen_ai_config');
     setApiKey('');
-    setGlobalApiKey('');
+    const resetConfig = { ...aiConfig, apiKey: '' };
+    setAiConfig(resetConfig);
+    updateAiConfig(resetConfig);
     setProject(null);
   };
 
@@ -170,70 +225,15 @@ function App() {
     }
   };
 
-  // API Key Entry Screen (Industrial Design)
-  if (!apiKey) {
-    return (
-      <>
-        <div className="h-screen bg-primary flex flex-col items-center justify-center p-8 relative overflow-hidden transition-colors duration-300">
-          {/* Background Accents */}
-          <div className="absolute top-0 right-0 p-64 bg-brand-muted blur-[150px] rounded-full pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 p-48 bg-tertiary/20 blur-[120px] rounded-full pointer-events-none"></div>
-
-          <div className="w-full max-w-md bg-secondary border border-main p-8 rounded-xl shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-300">
-
-            <div className="flex items-center gap-3 mb-8 border-b border-main pb-6">
-              <div className="w-10 h-10 bg-brand text-white flex items-center justify-center rounded">
-                <Key className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-main tracking-wide">CineGen AI Director</h1>
-                <p className="text-[10px] text-dim uppercase tracking-widest font-mono">Authentication Required</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <label className="block text-[10px] font-bold text-dim uppercase tracking-widest mb-2">Google Gemini API Key</label>
-                <input
-                  type="password"
-                  value={inputKey}
-                  onChange={(e) => setInputKey(e.target.value)}
-                  placeholder="Enter your API Key..."
-                  className="w-full bg-tertiary border border-main text-main px-4 py-3 text-sm rounded-lg focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand-muted transition-all font-mono placeholder:text-muted"
-                />
-                <p className="mt-3 text-[10px] text-dim leading-relaxed">
-                  本应用需要 Gemini 2.5 Flash 及 Veo 视频生成权限。请确保您的 API Key 关联了已开通结算功能的 Google Cloud 项目。
-                  <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-brand hover:underline ml-1">查看文档</a>
-                </p>
-              </div>
-
-              <button
-                onClick={handleSaveKey}
-                disabled={!inputKey}
-                className="w-full py-3 bg-brand text-white font-bold uppercase tracking-widest text-xs rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirm Access <ArrowRight className="w-3 h-3" />
-              </button>
-
-              <div className="flex items-center justify-center gap-2 text-[10px] text-muted font-mono">
-                <ShieldCheck className="w-3 h-3" />
-                Key is stored locally in your browser
-              </div>
-            </div>
-          </div>
-        </div>
-        <HomeLinks />
-      </>
-    );
-  }
-
   // Dashboard View
   if (!project) {
     return (
       <div className="bg-primary min-h-screen transition-colors duration-300">
-        <button onClick={handleClearKey} className="fixed top-4 right-4 z-50 text-[10px] text-dim hover:text-red-500 transition-colors uppercase font-mono tracking-widest">
-          Sign Out
-        </button>
+        {apiKey && (
+          <button onClick={handleClearKey} className="fixed top-4 right-4 z-50 text-[10px] text-dim hover:text-red-500 transition-colors uppercase font-mono tracking-widest">
+            Sign Out
+          </button>
+        )}
         <Dashboard onOpenProject={handleOpenProject} />
         <HomeLinks />
         <button 
@@ -249,7 +249,9 @@ function App() {
           onThemeColorChange={handleThemeColorChange} 
           currentThemeMode={themeMode}
           onThemeModeChange={handleThemeModeChange}
-        />
+          aiConfig={aiConfig}
+          onAiConfigChange={handleAiConfigChange}
+          />
       </div>
     );
   }
@@ -269,19 +271,21 @@ function App() {
         {renderStage()}
 
         {/* Save Status Indicator */}
-        <div className="absolute top-4 right-6 pointer-events-none opacity-50 flex items-center gap-2 text-xs font-mono text-dim bg-secondary border border-main px-2 py-1 rounded-full backdrop-blur-sm z-50">
-          {saveStatus === 'saving' ? (
-            <>
-              <Save className="w-3 h-3 animate-pulse" />
-              保存中...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="w-3 h-3 text-green-500" />
-              已保存
-            </>
-          )}
-        </div>
+        {(saveStatus === 'saving' || saveStatus === 'saved') && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none flex items-center gap-2 text-xs font-mono text-dim bg-secondary/80 border border-main px-4 py-1.5 rounded-full backdrop-blur-md z-50 animate-in fade-in slide-in-from-top-4 duration-500 shadow-xl border-brand/20">
+            {saveStatus === 'saving' ? (
+              <>
+                <Save className="w-3 h-3 animate-pulse text-brand" />
+                <span className="opacity-70">保存中...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-3 h-3 text-green-500" />
+                <span className="text-green-500/80">已保存</span>
+              </>
+            )}
+          </div>
+        )}
       </main>
 
       <SettingsModal 
@@ -291,6 +295,8 @@ function App() {
         onThemeColorChange={handleThemeColorChange} 
         currentThemeMode={themeMode}
         onThemeModeChange={handleThemeModeChange}
+        aiConfig={aiConfig}
+        onAiConfigChange={handleAiConfigChange}
       />
 
       <div className="lg:hidden fixed inset-0 bg-black z-[100] flex items-center justify-center p-8 text-center">

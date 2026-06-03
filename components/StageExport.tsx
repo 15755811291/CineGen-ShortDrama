@@ -14,6 +14,28 @@ const StageExport: React.FC<Props> = ({ project }) => {
   // Calculate total duration roughly
   const estimatedDuration = project.shots.reduce((acc, s) => acc + (s.interval?.duration || 3), 0);
 
+  const handleDownload = () => {
+    if (progress < 100) return;
+    
+    // 获取所有生成的视频链接
+    const videoUrls = project.shots.map(s => s.interval?.videoUrl).filter(Boolean);
+    
+    if (videoUrls.length > 0) {
+      // 这里的逻辑可以根据需求调整：
+      // 1. 如果有后端，发送合成请求
+      // 2. 目前作为演示，我们可以依次打开下载或下载第一个
+      const link = document.createElement('a');
+      link.href = videoUrls[0] as string;
+      link.download = `${project.scriptData?.title || 'cinegen'}_master.mp4`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert("正在为您准备视频下载。由于目前处于预览阶段，我们将为您打开第一个镜头的原始视频，完整串联合成功能正在接入中。");
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-primary overflow-hidden transition-colors duration-300">
       
@@ -120,10 +142,12 @@ const StageExport: React.FC<Props> = ({ project }) => {
              </div>
 
              {/* Action Buttons */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <button 
-                  disabled={progress < 100} 
-                  className={`h-12 rounded-lg flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-widest transition-all border ${
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button 
+                 onClick={handleDownload}
+                 disabled={progress < 100} 
+                 className={`h-12 rounded-lg flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-widest transition-all border ${
+
                  progress === 100 
                    ? 'bg-brand text-white hover:opacity-90 border-brand shadow-lg shadow-brand/10' 
                    : 'bg-tertiary text-muted border-main cursor-not-allowed'

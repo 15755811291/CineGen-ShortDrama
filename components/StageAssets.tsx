@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, MapPin, Check, Sparkles, Loader2, Users, RefreshCw, Shirt, Plus, X, Camera, ChevronRight } from 'lucide-react';
 import { ProjectState, Character, CharacterVariation } from '../types';
-import { generateImage, generateVisualPrompts } from '../services/geminiService';
+import { generateImage, generateVisualPrompts } from '../services/aiService';
 
 interface Props {
   project: ProjectState;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Play, SkipForward, SkipBack, Loader2, Video, Image as ImageIcon, ArrowRight, LayoutGrid, Maximize2, Sparkles, AlertCircle, MapPin, User, Clock, ChevronLeft, ChevronRight, ArrowLeft, MessageSquare, X, Film, Aperture, Shirt } from 'lucide-react';
 import { ProjectState, Shot, Keyframe } from '../types';
-import { generateImage, generateVideo } from '../services/geminiService';
+import { generateImage, generateVideo } from '../services/aiService';
 
 interface Props {
   project: ProjectState;
@@ -107,29 +107,35 @@ const StageDirector: React.FC<Props> = ({ project, updateProject }) => {
   };
 
   const handleGenerateVideo = async (shot: Shot) => {
-    if (!shot.interval) return;
+    // 自动补全缺失的 interval 对象
+    const currentInterval = shot.interval || {
+      id: `interval-${shot.id}`,
+      startKeyframeId: shot.keyframes?.find(k => k.type === 'start')?.id || '',
+      endKeyframeId: shot.keyframes?.find(k => k.type === 'end')?.id || '',
+      duration: 5,
+      motionStrength: 5,
+      status: 'pending'
+    };
     
     const sKf = shot.keyframes?.find(k => k.type === 'start');
     const eKf = shot.keyframes?.find(k => k.type === 'end');
 
     if (!sKf?.imageUrl) return alert("请先生成起始帧！");
-
-    // Fix: Remove logic that auto-grabs next shot's frame.
-    // Prevent morphing artifacts by defaulting to Image-to-Video unless an End Frame is explicitly generated.
+    
     let endImageUrl = eKf?.imageUrl;
     
-    setProcessingState({ id: shot.interval.id, type: 'video' });
+    setProcessingState({ id: currentInterval.id, type: 'video' });
     
     try {
       const videoUrl = await generateVideo(
           shot.actionSummary, 
           sKf.imageUrl, 
-          endImageUrl // Only pass if it exists
+          endImageUrl
       );
 
       updateShot(shot.id, (s) => ({
         ...s,
-        interval: s.interval ? { ...s.interval, videoUrl, status: 'completed' } : undefined
+        interval: { ...currentInterval, videoUrl, status: 'completed' }
       }));
     } catch (e: any) {
       console.error(e);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrainCircuit, Wand2, ChevronRight, AlertCircle, Users, MapPin, List, TextQuote, Clock, BookOpen, PenTool, ArrowLeft, Languages, Aperture, AlignLeft } from 'lucide-react';
 import { ProjectState } from '../types';
-import { parseScriptToData, generateShotList } from '../services/geminiService';
+import { parseScriptToData, generateShotList } from '../services/aiService';
 
 interface Props {
   project: ProjectState;
