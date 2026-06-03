@@ -7,25 +7,69 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+      :root {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8f8f8;
+        --bg-tertiary: #f0f0f0;
+        --text-primary: #111111;
+        --text-secondary: #666666;
+        --text-tertiary: #999999;
+        --border-color: #e5e5e5;
+        --panel-bg: rgba(255, 255, 255, 0.7);
+        --brand-color: #6366f1;
+        --brand-color-rgb: 99, 102, 241;
+      }
+
+      .dark {
+        --bg-primary: #050505;
+        --bg-secondary: #0a0a0a;
+        --bg-tertiary: #141414;
+        --text-primary: #ffffff;
+        --text-secondary: #a1a1aa;
+        --text-tertiary: #71717a;
+        --border-color: #1f1f1f;
+        --panel-bg: rgba(20, 20, 20, 0.6);
+      }
+
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #050505;
-        color: #e5e5e5;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        transition: background-color 0.3s ease, color 0.3s ease;
       }
+      
+      .text-brand { color: var(--brand-color); }
+      .bg-brand { background-color: var(--brand-color); }
+      .border-brand { border-color: var(--brand-color); }
+      .ring-brand { --tw-ring-color: var(--brand-color); }
+      
+      .bg-brand-muted { background-color: rgba(var(--brand-color-rgb), 0.1); }
+      .text-brand-muted { color: rgba(var(--brand-color-rgb), 0.8); }
+      .border-brand-muted { border-color: rgba(var(--brand-color-rgb), 0.2); }
+
+      /* Dynamic Theme Classes */
+      .bg-primary { background-color: var(--bg-primary); }
+      .bg-secondary { background-color: var(--bg-secondary); }
+      .bg-tertiary { background-color: var(--bg-tertiary); }
+      .text-main { color: var(--text-primary); }
+      .text-dim { color: var(--text-secondary); }
+      .text-muted { color: var(--text-tertiary); }
+      .border-main { border-color: var(--border-color); }
+
       /* Sony Style Scrollbar - Thin, Rectangular */
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: #0a0a0a; 
+        background: var(--bg-secondary); 
       }
       ::-webkit-scrollbar-thumb {
-        background: #333; 
+        background: var(--border-color); 
         border-radius: 0px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #555; 
+        background: var(--text-tertiary); 
       }
       
       .font-mono {
@@ -34,9 +78,9 @@
       
       /* Utilities */
       .glass-panel {
-        background: rgba(20, 20, 20, 0.6);
+        background: var(--panel-bg);
         backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border-color);
       }
     </style>
   <script type="importmap">
